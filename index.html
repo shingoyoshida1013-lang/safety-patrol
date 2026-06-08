@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#e65100">
+  <title>安全パトロール判定</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --primary: #e65100;
+      --primary-dark: #bf360c;
+      --ok: #2e7d32;
+      --ng: #c62828;
+      --na: #616161;
+      --bg: #f5f5f5;
+      --card: #ffffff;
+      --border: #e0e0e0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', sans-serif;
+      background: var(--bg);
+      color: #212121;
+      font-size: 15px;
+      padding-bottom: 80px;
+    }
+
+    /* ヘッダー */
+    header {
+      background: var(--primary);
+      color: white;
+      padding: 14px 16px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+    header h1 { font-size: 18px; font-weight: 700; }
+    header p { font-size: 12px; opacity: 0.85; margin-top: 2px; }
+
+    /* カード */
+    .card {
+      background: var(--card);
+      border-radius: 10px;
+      margin: 12px;
+      padding: 14px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    }
+    .card-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--primary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* フォーム */
+    .field { margin-bottom: 12px; }
+    .field label {
+      display: block;
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+    .field input[type="text"],
+    .field input[type="date"],
+    .field textarea,
+    .field select {
+      width: 100%;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 15px;
+      font-family: inherit;
+      background: white;
+      -webkit-appearance: none;
+    }
+    .field input:focus, .field textarea:focus, .field select:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+    .field textarea { min-height: 70px; resize: vertical; }
+
+    /* GPS */
+    .gps-row { display: flex; align-items: center; gap: 8px; }
+    .gps-row input { flex: 1; }
+    .btn-gps {
+      background: #1565c0;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    #gps-status { font-size: 12px; color: #666; margin-top: 4px; }
+
+    /* === 写真 & AI 判定エリア === */
+    .photo-step {
+      background: #fff8f5;
+      border: 2px dashed var(--primary);
+      border-radius: 10px;
+      padding: 16px;
+      text-align: center;
+      margin-bottom: 12px;
+    }
+    .photo-step p { font-size: 13px; color: #777; margin-bottom: 10px; }
+    .btn-camera {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 13px 20px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      width: 100%;
+      justify-content: center;
+    }
+    .btn-camera:active { opacity: 0.85; }
+    #photo-input { display: none; }
+
+    .photo-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .photo-thumb {
+      position: relative;
+      aspect-ratio: 1;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #eee;
+    }
+    .photo-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .photo-thumb .del-btn {
+      position: absolute;
+      top: 4px; right: 4px;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 24px; height: 24px;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* AI判定ボタン */
+    .btn-ai {
+      width: 100%;
+      background: linear-gradient(135deg, #1565c0, #0d47a1);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 15px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      letter-spacing: 0.5px;
+    }
+    .btn-ai:disabled { background: #bdbdbd; cursor: not-allowed; }
+    .btn-ai:active:not(:disabled) { opacity: 0.9; }
+
+    /* AI判定結果バナー */
+    .ai-result-banner {
+      display: none;
+      background: #e8f5e9;
+      border: 1.5px solid #66bb6a;
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-top: 10px;
+      font-size: 13px;
+      color: #1b5e20;
+    }
+    .ai-result-banner.show { display: block; }
+    .ai-result-banner strong { font-size: 14px; }
+
+    /* AI信頼度バッジ */
+    .ai-badge {
+      display: inline-block;
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 10px;
+      margin-left: 4px;
+      font-weight: 700;
+      vertical-align: middle;
+    }
+    .ai-badge.high { background: #c8e6c9; color: #1b5e20; }
+    .ai-badge.mid  { background: #fff9c4; color: #f57f17; }
+    .ai-badge.low  { background: #ffcdd2; color: #b71c1c; }
+
+    /* パトロール項目 */
+    .patrol-category { margin-bottom: 16px; }
+    .category-header {
+      background: #fff3e0;
+      border-left: 4px solid var(--primary);
+      padding: 8px 12px;
+      font-weight: 700;
+      font-size: 14px;
+      margin-bottom: 8px;
+      border-radius: 0 6px 6px 0;
+    }
+    .patrol-item {
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      background: #fafafa;
+      transition: border-color 0.2s;
+    }
+    .patrol-item.ai-judged { border-color: #1565c0; background: #f0f4ff; }
+    .patrol-item-name { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+
+    .radio-group { display: flex; gap: 8px; }
+    .radio-btn { flex: 1; position: relative; }
+    .radio-btn input { display: none; }
+    .radio-btn label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 7px 4px;
+      border-radius: 6px;
+      border: 2px solid var(--border);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s;
+      background: white;
+    }
+    .radio-btn.ok input:checked + label  { background: var(--ok); border-color: var(--ok); color: white; }
+    .radio-btn.ng input:checked + label  { background: var(--ng); border-color: var(--ng); color: white; }
+    .radio-btn.na input:checked + label  { background: var(--na); border-color: var(--na); color: white; }
+
+    .ng-comment { display: none; margin-top: 8px; }
+    .ng-comment.visible { display: block; }
+    .ng-comment textarea {
+      width: 100%;
+      border: 1.5px solid var(--ng);
+      border-radius: 6px;
+      padding: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      min-height: 60px;
+    }
+
+    /* 総合判定 */
+    .overall-select { display: flex; gap: 10px; margin-top: 8px; }
+    .overall-btn {
+      flex: 1;
+      padding: 14px;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      text-align: center;
+      background: white;
+      transition: all 0.15s;
+    }
+    .overall-btn.selected-ok    { background: var(--ok); border-color: var(--ok); color: white; }
+    .overall-btn.selected-ng    { background: var(--ng); border-color: var(--ng); color: white; }
+    .overall-btn.selected-watch { background: #f57f17; border-color: #f57f17; color: white; }
+
+    /* 送信 */
+    .submit-area {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: white;
+      padding: 12px 16px;
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.15);
+      z-index: 100;
+    }
+    .btn-submit {
+      width: 100%;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 16px;
+      font-size: 17px;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 1px;
+    }
+    .btn-submit:disabled { background: #bdbdbd; cursor: not-allowed; }
+    .btn-submit:active:not(:disabled) { background: var(--primary-dark); }
+
+    /* オーバーレイ */
+    #overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.65);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 16px;
+      color: white;
+      font-size: 16px;
+      font-weight: 700;
+    }
+    #overlay.show { display: flex; }
+    #overlay-msg { font-size: 15px; }
+    .spinner {
+      width: 52px; height: 52px;
+      border: 5px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .progress-bar-wrap {
+      width: 240px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 20px;
+      height: 8px;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      background: white;
+      border-radius: 20px;
+      transition: width 0.4s ease;
+      width: 0%;
+    }
+
+    /* トースト */
+    #toast {
+      display: none;
+      position: fixed;
+      bottom: 90px; left: 50%;
+      transform: translateX(-50%);
+      background: #212121;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 24px;
+      font-size: 14px;
+      z-index: 300;
+      white-space: nowrap;
+    }
+    #toast.show { display: block; }
+    .required { color: var(--ng); }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🦺 安全パトロール判定</h1>
+  <p id="header-date"></p>
+</header>
+
+<!-- 基本情報 -->
+<div class="card">
+  <div class="card-title">📋 基本情報</div>
+  <div class="field">
+    <label>点検日 <span class="required">*</span></label>
+    <input type="date" id="date">
+  </div>
+  <div class="field">
+    <label>現場名 <span class="required">*</span></label>
+    <input type="text" id="site-name" placeholder="例：〇〇新築工事">
+  </div>
+  <div class="field">
+    <label>点検者名 <span class="required">*</span></label>
+    <input type="text" id="inspector" placeholder="氏名を入力">
+  </div>
+  <div class="field">
+    <label>天気</label>
+    <select id="weather">
+      <option value="晴れ">☀️ 晴れ</option>
+      <option value="曇り">☁️ 曇り</option>
+      <option value="雨">🌧️ 雨</option>
+      <option value="雪">❄️ 雪</option>
+      <option value="強風">💨 強風</option>
+    </select>
+  </div>
+  <div class="field">
+    <label>📍 現場位置</label>
+    <div class="gps-row">
+      <input type="text" id="location" placeholder="GPS取得またはテキスト入力" readonly>
+      <button class="btn-gps" onclick="getGPS()">📡 GPS</button>
+    </div>
+    <div id="gps-status"></div>
+  </div>
+  <div class="field">
+    <label>Google Maps リンク</label>
+    <input type="text" id="maps-link" placeholder="自動生成" readonly>
+  </div>
+</div>
+
+<!-- 写真 & AI自動判定 -->
+<div class="card">
+  <div class="card-title">📷 写真撮影 → AI自動判定</div>
+
+  <div class="photo-step">
+    <p>現場の写真を撮影してください（複数枚推奨）<br>AIが安全項目を自動判定します</p>
+    <button class="btn-camera" onclick="document.getElementById('photo-input').click()">
+      📸 写真を撮影・選択（最大5枚）
+    </button>
+    <input type="file" id="photo-input" accept="image/*" capture="environment" multiple onchange="handlePhotos(event)">
+  </div>
+
+  <div class="photo-grid" id="photo-grid"></div>
+
+  <button class="btn-ai" id="btn-ai" disabled onclick="runAiJudgment()">
+    🤖 AIで自動判定する
+  </button>
+
+  <div class="ai-result-banner" id="ai-banner">
+    <strong>✅ AI自動判定が完了しました</strong><br>
+    <span id="ai-summary"></span><br>
+    <small style="color:#388e3c">青枠の項目がAIによる判定です。修正して送信できます。</small>
+  </div>
+</div>
+
+<!-- パトロール項目 -->
+<div class="card">
+  <div class="card-title">🔍 パトロール点検項目</div>
+  <p style="font-size:12px;color:#666;margin-bottom:12px;">
+    AI判定後も手動で修正できます。NG の場合は内容を記入してください。
+  </p>
+  <div id="patrol-items"></div>
+</div>
+
+<!-- 総合判定 -->
+<div class="card">
+  <div class="card-title">📊 総合判定</div>
+  <div class="overall-select">
+    <button class="overall-btn" id="btn-ok"    onclick="setOverall('良好')">✅<br>良好</button>
+    <button class="overall-btn" id="btn-watch" onclick="setOverall('要注意')">⚠️<br>要注意</button>
+    <button class="overall-btn" id="btn-ng"    onclick="setOverall('要改善')">❌<br>要改善</button>
+  </div>
+  <div class="field" style="margin-top:12px;">
+    <label>総合コメント・特記事項</label>
+    <textarea id="overall-comment" placeholder="総合的な所見や特記事項を入力"></textarea>
+  </div>
+</div>
+
+<div class="submit-area">
+  <button class="btn-submit" onclick="submitForm()">送信してスプレッドシートに保存</button>
+</div>
+
+<div id="overlay">
+  <div class="spinner"></div>
+  <div id="overlay-msg">処理中...</div>
+  <div class="progress-bar-wrap">
+    <div class="progress-bar" id="progress-bar"></div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+// ==============================
+// ★ GAS デプロイURLをここに貼り付け ★
+// ==============================
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzn7CNnHT-O3jEB-zqdoPJErgjBJ5X_62hNHjFjDkb8h8AG3Si8OrLiVCJ4OR7E5U9IiA/exec';
+
+// ==============================
+// パトロール項目定義（建設業）
+// ==============================
+const PATROL_CATEGORIES = [
+  {
+    name: '墜落・転落防止',
+    items: [
+      { label: '足場・作業床の組立状態',          keys: ['scaffold','scaffolding','platform','staging'] },
+      { label: '手すり・中桟・幅木の設置',          keys: ['handrail','railing','guardrail','fence'] },
+      { label: '開口部・端部の養生・覆い',          keys: ['opening','cover','hole','protection'] },
+      { label: '安全帯（ハーネス）の着用と取付設備', keys: ['harness','safety harness','lanyard','fall protection','belt'] },
+      { label: '脚立・はしごの安全使用',            keys: ['ladder','stepladder','staircase'] },
+    ]
+  },
+  {
+    name: '飛来・落下防止',
+    items: [
+      { label: 'ヘルメットの着用状況',            keys: ['helmet','hard hat','hardhat','safety helmet','construction helmet'] },
+      { label: '資材・工具の固定・整理整頓',       keys: ['tool','equipment','material','clutter','organized','storage'] },
+      { label: '防護ネット・朝顔の設置状況',       keys: ['net','safety net','protective net','netting'] },
+      { label: '高所からの資材搬出方法',           keys: ['crane','hoist','lift','pulley'] },
+    ]
+  },
+  {
+    name: '建設機械・重機',
+    items: [
+      { label: '作業半径内の立入禁止区画',         keys: ['barrier','cone','tape','restricted','zone','fence'] },
+      { label: '誘導員・監視員の配置',             keys: ['worker','person','signal','flagman','spotter'] },
+      { label: '重機・クレーンの点検整備状態',      keys: ['crane','excavator','bulldozer','machinery','vehicle','truck','forklift'] },
+      { label: '合図・連絡方法の確認',             keys: ['sign','signal','communication','radio'] },
+    ]
+  },
+  {
+    name: '電気・感電防止',
+    items: [
+      { label: '仮設電気配線の絶縁・養生状態',     keys: ['wire','cable','electrical','wiring','cord'] },
+      { label: '漏電遮断器の設置・作動確認',       keys: ['breaker','circuit breaker','panel','electrical panel'] },
+      { label: '電動工具の絶縁・アース',           keys: ['power tool','drill','grinder','saw','electric tool'] },
+      { label: '架空電線への接触防止措置',         keys: ['power line','overhead wire','utility line','electric wire'] },
+    ]
+  },
+  {
+    name: '崩壊・倒壊防止',
+    items: [
+      { label: '山留め・土止め支保工の状態',       keys: ['excavation','shoring','retaining','earthwork','trench'] },
+      { label: '型枠支保工の状態・管理',           keys: ['formwork','framework','concrete form','shuttering'] },
+      { label: '積載荷重の管理',                  keys: ['load','weight','material','pile','stack'] },
+      { label: '軟弱地盤・路肩の養生',            keys: ['ground','soil','road','surface','footing'] },
+    ]
+  },
+  {
+    name: '火気・防火管理',
+    items: [
+      { label: '火気使用許可証の確認',             keys: ['permit','document','sign','notice','paper'] },
+      { label: '消火器の配置・使用期限確認',       keys: ['fire extinguisher','extinguisher','fire safety'] },
+      { label: '危険物・可燃物の適切な保管',       keys: ['fuel','gasoline','drum','container','flammable','chemical'] },
+      { label: '溶接・溶断時の火花養生',           keys: ['welding','welder','torch','spark','flame'] },
+    ]
+  },
+  {
+    name: '整理整頓・通路確保',
+    items: [
+      { label: '作業通路・避難経路の確保',         keys: ['passage','pathway','corridor','walkway','aisle','route'] },
+      { label: '資材・廃材の分別・整理',           keys: ['waste','debris','material','trash','rubbish','lumber'] },
+      { label: '安全標識・表示板の整備',           keys: ['sign','signage','warning sign','safety sign','notice board'] },
+      { label: '照明設備の適切な設置',            keys: ['light','lighting','lamp','illumination','floodlight'] },
+    ]
+  },
+  {
+    name: '健康管理・作業管理',
+    items: [
+      { label: '朝礼・KY（危険予知）活動の実施',   keys: ['meeting','briefing','group','worker','gathering'] },
+      { label: '作業手順書・施工計画の遵守',       keys: ['document','plan','drawing','manual','procedure'] },
+      { label: '保護具（防塵マスク等）の着用',     keys: ['mask','respirator','glove','protective gear','ppe','vest','safety vest'] },
+      { label: '熱中症・寒冷対策の実施',          keys: ['water','drink','shade','shelter','fan','cooling'] },
+    ]
+  },
+];
+
+// ==============================
+// 初期化
+// ==============================
+window.addEventListener('DOMContentLoaded', () => {
+  const today = new Date();
+  document.getElementById('date').value = today.toISOString().split('T')[0];
+  document.getElementById('header-date').textContent =
+    today.toLocaleDateString('ja-JP', { year:'numeric', month:'long', day:'numeric', weekday:'short' });
+
+  const savedName = localStorage.getItem('inspector_name');
+  if (savedName) document.getElementById('inspector').value = savedName;
+  const savedSite = localStorage.getItem('site_name');
+  if (savedSite) document.getElementById('site-name').value = savedSite;
+
+  if (!GAS_URL) {
+    const url = prompt('Google Apps Script のデプロイURLを入力してください：');
+    if (url) { localStorage.setItem('gas_url', url); location.reload(); }
+  }
+
+  buildPatrolItems();
+});
+
+// ==============================
+// パトロール項目を動的生成
+// ==============================
+function buildPatrolItems() {
+  const container = document.getElementById('patrol-items');
+  container.innerHTML = '';
+  PATROL_CATEGORIES.forEach((cat, ci) => {
+    const catDiv = document.createElement('div');
+    catDiv.className = 'patrol-category';
+    catDiv.innerHTML = `<div class="category-header">${ci+1}. ${cat.name}</div>`;
+    cat.items.forEach((item, ii) => {
+      const id = `item_${ci}_${ii}`;
+      const itemDiv = document.createElement('div');
+      itemDiv.className = 'patrol-item';
+      itemDiv.id = `div_${id}`;
+      itemDiv.innerHTML = `
+        <div class="patrol-item-name" id="name_${id}">${item.label}</div>
+        <div class="radio-group">
+          <div class="radio-btn ok">
+            <input type="radio" name="${id}" id="${id}_ok" value="OK" onchange="onRadioChange('${id}')">
+            <label for="${id}_ok">✅ OK</label>
+          </div>
+          <div class="radio-btn ng">
+            <input type="radio" name="${id}" id="${id}_ng" value="NG" onchange="onRadioChange('${id}')">
+            <label for="${id}_ng">❌ NG</label>
+          </div>
+          <div class="radio-btn na">
+            <input type="radio" name="${id}" id="${id}_na" value="対象外" onchange="onRadioChange('${id}')">
+            <label for="${id}_na">－ 対象外</label>
+          </div>
+        </div>
+        <div class="ng-comment" id="${id}_comment">
+          <textarea placeholder="不具合内容・改善要求事項を入力"></textarea>
+        </div>
+      `;
+      catDiv.appendChild(itemDiv);
+    });
+    container.appendChild(catDiv);
+  });
+}
+
+function onRadioChange(id) {
+  const val = document.querySelector(`input[name="${id}"]:checked`)?.value;
+  const commentEl = document.getElementById(`${id}_comment`);
+  commentEl.classList.toggle('visible', val === 'NG');
+  // 手動変更したらAIバッジを削除
+  const nameEl = document.getElementById(`name_${id}`);
+  const badge = nameEl.querySelector('.ai-badge');
+  if (badge) badge.remove();
+  document.getElementById(`div_${id}`).classList.remove('ai-judged');
+}
+
+// ==============================
+// GPS取得
+// ==============================
+function getGPS() {
+  const status = document.getElementById('gps-status');
+  status.textContent = '📡 GPS取得中...';
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const lat = pos.coords.latitude.toFixed(6);
+      const lng = pos.coords.longitude.toFixed(6);
+      document.getElementById('location').value = `${lat}, ${lng}`;
+      document.getElementById('maps-link').value = `https://maps.google.com/?q=${lat},${lng}`;
+      status.textContent = `✅ 取得完了（精度：約${Math.round(pos.coords.accuracy)}m）`;
+    },
+    (err) => { status.textContent = `❌ GPS取得失敗：${err.message}`; },
+    { enableHighAccuracy: true, timeout: 15000 }
+  );
+}
+
+// ==============================
+// 写真処理
+// ==============================
+const photos = [];
+
+function handlePhotos(event) {
+  const files = Array.from(event.target.files);
+  const remaining = 5 - photos.length;
+  if (remaining <= 0) { showToast('写真は最大5枚までです'); return; }
+  files.slice(0, remaining).forEach(file => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      photos.push({ data: e.target.result, name: file.name });
+      renderPhotos();
+      document.getElementById('btn-ai').disabled = false;
+    };
+    reader.readAsDataURL(file);
+  });
+  event.target.value = '';
+}
+
+function renderPhotos() {
+  const grid = document.getElementById('photo-grid');
+  grid.innerHTML = '';
+  photos.forEach((photo, i) => {
+    const div = document.createElement('div');
+    div.className = 'photo-thumb';
+    div.innerHTML = `
+      <img src="${photo.data}" alt="写真${i+1}">
+      <button class="del-btn" onclick="deletePhoto(${i})">×</button>
+    `;
+    grid.appendChild(div);
+  });
+}
+
+function deletePhoto(index) {
+  photos.splice(index, 1);
+  renderPhotos();
+  if (photos.length === 0) document.getElementById('btn-ai').disabled = true;
+}
+
+// ==============================
+// AI自動判定（GAS → Cloud Vision API）
+// ==============================
+async function runAiJudgment() {
+  if (photos.length === 0) { showToast('写真を撮影してください'); return; }
+  if (!GAS_URL) { showToast('GAS URLが未設定です'); return; }
+
+  showOverlay('AI解析中... しばらくお待ちください', 30);
+
+  try {
+    const body = JSON.stringify({
+      action: 'analyze',
+      photos: photos.map(p => p.data),
+    });
+    const res = await fetch(GAS_URL, {
+      method: 'POST',
+      body,
+    });
+    const text = await res.text();
+    const json = JSON.parse(text);
+    hideOverlay();
+
+    if (json.status !== 'ok') throw new Error(json.message || '解析エラー');
+
+    applyAiResults(json.results, json.detectedLabels);
+
+  } catch (e) {
+    hideOverlay();
+    showToast('❌ AI判定失敗：' + e.message);
+    console.error(e);
+  }
+}
+
+// ==============================
+// AI結果をフォームに反映
+// ==============================
+function applyAiResults(results, detectedLabels) {
+  let autoCount = 0;
+  let ngCount = 0;
+
+  results.forEach((result, index) => {
+    if (!result.judgment) return;
+    const ci = result.categoryIndex;
+    const ii = result.itemIndex;
+    const id = `item_${ci}_${ii}`;
+    const judgment = result.judgment; // 'OK' | 'NG' | '対象外'
+    const confidence = result.confidence; // 'high' | 'mid' | 'low'
+
+    // ラジオボタンをセット
+    const radio = document.getElementById(`${id}_${judgment === 'OK' ? 'ok' : judgment === 'NG' ? 'ng' : 'na'}`);
+    if (radio) {
+      radio.checked = true;
+      onRadioChange(id);
+      autoCount++;
+      if (judgment === 'NG') {
+        ngCount++;
+        // NG理由を自動入力
+        const commentArea = document.getElementById(`${id}_comment`).querySelector('textarea');
+        if (result.reason) commentArea.value = result.reason;
+      }
+    }
+
+    // AIバッジを付与
+    const nameEl = document.getElementById(`name_${id}`);
+    const confLabel = confidence === 'high' ? '高精度' : confidence === 'mid' ? '中精度' : '低精度';
+    nameEl.innerHTML = PATROL_CATEGORIES[ci].items[ii].label +
+      `<span class="ai-badge ${confidence}">🤖 AI ${confLabel}</span>`;
+
+    // 枠色変更
+    document.getElementById(`div_${id}`).classList.add('ai-judged');
+  });
+
+  // サマリー表示
+  const banner = document.getElementById('ai-banner');
+  banner.classList.add('show');
+  document.getElementById('ai-summary').textContent =
+    `${autoCount}項目を自動判定（うちNG：${ngCount}件）｜検出ラベル：${(detectedLabels || []).slice(0, 6).join('、')}`;
+
+  // NGが多い場合は総合判定も自動セット
+  if (ngCount >= 3) setOverall('要改善');
+  else if (ngCount >= 1) setOverall('要注意');
+  else if (autoCount >= 5) setOverall('良好');
+
+  // パトロール項目までスクロール
+  document.getElementById('patrol-items').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ==============================
+// 総合判定
+// ==============================
+let overallJudgment = '';
+function setOverall(val) {
+  overallJudgment = val;
+  document.getElementById('btn-ok').className    = 'overall-btn' + (val === '良好'  ? ' selected-ok'    : '');
+  document.getElementById('btn-watch').className = 'overall-btn' + (val === '要注意' ? ' selected-watch' : '');
+  document.getElementById('btn-ng').className    = 'overall-btn' + (val === '要改善' ? ' selected-ng'    : '');
+}
+
+// ==============================
+// 送信
+// ==============================
+async function submitForm() {
+  const date      = document.getElementById('date').value;
+  const siteName  = document.getElementById('site-name').value.trim();
+  const inspector = document.getElementById('inspector').value.trim();
+
+  if (!date || !siteName || !inspector) {
+    showToast('❌ 点検日・現場名・点検者名は必須です');
+    window.scrollTo(0, 0);
+    return;
+  }
+  if (!overallJudgment) {
+    showToast('❌ 総合判定を選択してください');
+    return;
+  }
+
+  const results = [];
+  let ngCount = 0;
+  PATROL_CATEGORIES.forEach((cat, ci) => {
+    cat.items.forEach((item, ii) => {
+      const id  = `item_${ci}_${ii}`;
+      const val = document.querySelector(`input[name="${id}"]:checked`)?.value || '未点検';
+      const comment = document.getElementById(`${id}_comment`).querySelector('textarea').value.trim();
+      if (val === 'NG') ngCount++;
+      results.push({ category: cat.name, item: item.label, result: val, comment: val === 'NG' ? comment : '' });
+    });
+  });
+
+  localStorage.setItem('inspector_name', inspector);
+  localStorage.setItem('site_name', siteName);
+
+  const payload = {
+    action: 'save',
+    date, siteName, inspector,
+    weather: document.getElementById('weather').value,
+    location: document.getElementById('location').value,
+    mapsLink: document.getElementById('maps-link').value,
+    overallJudgment,
+    overallComment: document.getElementById('overall-comment').value.trim(),
+    ngCount,
+    results,
+    photos: photos.map(p => p.data),
+    submittedAt: new Date().toISOString(),
+  };
+
+  showOverlay('スプレッドシートに保存中...', 60);
+  document.querySelector('.btn-submit').disabled = true;
+
+  try {
+    const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
+    const json = await res.json();
+    hideOverlay();
+
+    if (json.status === 'ok') {
+      showToast('✅ 送信完了！スプレッドシートに保存されました');
+      setTimeout(() => {
+        if (confirm('送信が完了しました。フォームをリセットしますか？')) resetForm();
+      }, 1200);
+    } else {
+      throw new Error(json.message || '保存エラー');
+    }
+  } catch (e) {
+    hideOverlay();
+    document.querySelector('.btn-submit').disabled = false;
+    showToast('❌ 送信失敗：' + e.message);
+  }
+}
+
+function resetForm() {
+  overallJudgment = '';
+  setOverall('');
+  photos.length = 0;
+  renderPhotos();
+  document.getElementById('location').value = '';
+  document.getElementById('maps-link').value = '';
+  document.getElementById('gps-status').textContent = '';
+  document.getElementById('overall-comment').value = '';
+  document.getElementById('ai-banner').classList.remove('show');
+  document.getElementById('btn-ai').disabled = true;
+  buildPatrolItems();
+  document.querySelector('.btn-submit').disabled = false;
+  window.scrollTo(0, 0);
+}
+
+// ==============================
+// UI ヘルパー
+// ==============================
+function showOverlay(msg, progress) {
+  document.getElementById('overlay-msg').textContent = msg;
+  document.getElementById('progress-bar').style.width = progress + '%';
+  document.getElementById('overlay').classList.add('show');
+}
+function hideOverlay() {
+  document.getElementById('progress-bar').style.width = '100%';
+  setTimeout(() => document.getElementById('overlay').classList.remove('show'), 300);
+}
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+</script>
+</body>
+</html>
